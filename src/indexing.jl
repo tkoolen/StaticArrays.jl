@@ -58,6 +58,8 @@ end
 
 @inline index_size(::Size, ::Int) = Size()
 @inline index_size(::Size, a::StaticArray) = Size(a)
+@inline index_size(s::Size, a::UnitRange) = s
+@inline index_size(s::Size, a::Base.OneTo) = s
 @inline index_size(s::Size, ::Colon) = s
 
 @inline index_sizes(::S, inds...) where {S<:Size} = map(index_size, unpack_size(S), inds)
@@ -76,6 +78,8 @@ linear_index_size(ind_sizes::Type{<:Size}...) = _linear_index_size((), ind_sizes
 
 _ind(i::Int, ::Int, ::Type{Int}) = :(inds[$i])
 _ind(i::Int, j::Int, ::Type{<:StaticArray}) = :(inds[$i][$j])
+_ind(i::Int, j::Int, ::Type{<:UnitRange}) = :(inds[$i][$j])
+_ind(i::Int, j::Int, ::Type{<:Base.OneTo}) = :(inds[$i][$j])
 _ind(i::Int, j::Int, ::Type{Colon}) = j
 
 ################################
@@ -259,8 +263,25 @@ end
 
 # setindex!
 
-@propagate_inbounds function setindex!(a::StaticArray, value, inds::Union{Int, StaticArray{<:Any, Int}, Colon}...)
+@propagate_inbounds function setindex!(a::StaticArray, value, inds::Union{Int, StaticArray{<:Any, Int}, Colon, <:UnitRange, <:Base.OneTo}...)
     _setindex!(a, value, index_sizes(Size(a), inds...), inds)
+end
+
+# setindex! with statically-sized right hand side
+#
+# Note the bound on the element types of `a` and `value`. This is to avoid ambiguities which could arise when
+# `eltype(a) isa AbstractArray` here.
+#
+# The idea is as follows: if types `U` and `L` can be found that simultaneously bound `Ta` and `Tvalue`,
+# then `Ta` and `Tvalue` are *comparable*. That is, either:
+#
+# * `Ta` is 'at least as big' as `Tvalue`, or
+# * `Tvalue is 'at least as big' as `Ta`
+#
+# Ideally, setindex! should work whenever `Ta` is constructible from `Tvalue`, but this is a decent approximation
+# using the type system.
+@propagate_inbounds function setindex!(a::AbstractArray{Ta}, value::StaticArray{<:Any, Tvalue}, inds::Union{Int, StaticArray{<:Any, Int}, Colon, <:UnitRange, <:Base.OneTo}...) where {L, U, L<:Ta<:U, L<:Tvalue<:U}
+    _setindex!(a, value, index_sizes(Size(value), inds...), inds)
 end
 
 # Hard to describe "Union{Int, StaticArray{<:Any, Int}} with at least one StaticArray{<:Any, Int}"
