@@ -150,7 +150,9 @@ end
     sizes = [sz.parameters[1] for sz ∈ s.parameters]
 
     while more
-        exprs_vals = [(!(a[i] <: AbstractArray) ? :(a[$i][]) : :(a[$i][$(broadcasted_index(sizes[i], current_ind))])) for i = 1:length(sizes)]
+        exprs_vals = [
+
+        (!(a[i] <: AbstractArray) ? :(a[$i]) : :(a[$i][$(broadcasted_index(sizes[i], current_ind))])) for i = 1:length(sizes)]
         exprs[current_ind...] = :(f($(exprs_vals...)))
 
         # increment current_ind (maybe use CartesianIndices?)
@@ -208,7 +210,7 @@ end
     more = prod(newsize) > 0
     current_ind = ones(Int, max(length(newsize), length.(sizes)...))
     while more
-        exprs_vals = [(!(as[i] <: AbstractArray) ? :(as[$i][]) : :(as[$i][$(broadcasted_index(sizes[i], current_ind))])) for i = 1:length(sizes)]
+        exprs_vals = [(!(as[i] <: AbstractArray) ? :(as[$i]) : :(as[$i][$(broadcasted_index(sizes[i], current_ind))])) for i = 1:length(sizes)]
         exprs[current_ind...] = :(dest[$j] = f($(exprs_vals...)))
 
         # increment current_ind (maybe use CartesianIndices?)
