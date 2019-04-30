@@ -236,20 +236,20 @@ end
 @inline LinearAlgebra.norm_sqr(v::StaticVector) = mapreduce(abs2, +, v; init=zero(real(eltype(v))))
 
 @inline norm(a::StaticArray) = _norm(Size(a), a)
-@generated function _norm(::Size{S}, a::StaticArray) where {S}
+@inline function _norm(::Size{S}, a::StaticArray) where {S}
     if prod(S) == 0
-        return :(zero(real(eltype(a))))
+        z = zero(eltype(a))
+    else
+        # Use an actual element if there is one, to support e.g. Vector{<:Number}
+        # element types for which runtime size information is required to construct
+        # a zero element.
+        z = zero(a[1])
     end
-
-    expr = :(abs2(a[1]))
-    for j = 2:prod(S)
-        expr = :($expr + abs2(a[$j]))
+    ret = LinearAlgebra.norm_sqr(z) + LinearAlgebra.norm_sqr(z)
+    @inbounds @simd for j = 1 : prod(S)
+        ret += LinearAlgebra.norm_sqr(a[j])
     end
-
-    return quote
-        $(Expr(:meta, :inline))
-        @inbounds return sqrt($expr)
-    end
+    return ret
 end
 
 _norm_p0(x) = x == 0 ? zero(x) : one(x)
